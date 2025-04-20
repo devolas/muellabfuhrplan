@@ -9,3 +9,5 @@ venv.bak/
 build/
 *.ics
 *.egg-info
+__pycache__/
+lastmodified.txt
