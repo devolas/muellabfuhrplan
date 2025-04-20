@@ -1,7 +1,8 @@
 import urllib.request
 import json
 import sqlite3
-from datetime import datetime,date
+import argparse
+from datetime import datetime, timedelta
 import logging
 from ics import Calendar, Event
 
@@ -13,14 +14,14 @@ muellsorten = {
     "christ": "Christbaum",
 }
 
-def main():
+def main(offset=None, duration=None):
     (date, hasChanged) = isModified()
     if (hasChanged):
         print("Es gibt Neuigkeiten")
-        updateCalendar()
+        updateCalendar(offset, duration)
         updateModifcationDate(date)
 
-def updateCalendar():
+def updateCalendar(offset=None, duration=None):
     calendarfile = "pickups.ics"
 
     pickups = getPickups()
@@ -38,13 +39,20 @@ def updateCalendar():
                         e = Event()
                         e.name = muelllang + " in " + location['name']
                         print(type(e))
-                        e.begin = pickup['year'] + '-' + pickup['month'] + '-' + pickup['day'] # + "00:00:00") 
-                        e.make_all_day()
+                        e.begin =  calcDateTimeBegin(pickup) if (offset==None) else calcDateTimeBegin(pickup, offset) 
+                        if(duration == None): 
+                            e.make_all_day() 
+                        else: 
+                            e.duration = timedelta(hours=duration) 
                         c.events.add(e)
 
         calfile = open("pickups" + location['shorthand'] + ".ics", 'w')
         calfile.writelines(c.serialize_iter())
-        calfile.close()        
+        calfile.close()
+
+def calcDateTimeBegin(pickup, offset=0):
+    print(offset)
+    return  datetime(int(pickup['year']),  int(pickup['month']),  int(pickup['day']))+timedelta(hours=offset)
 
 def isModified():
     lastOnlineDate = getLastModified()
@@ -88,6 +96,32 @@ def getFreshData(url):
     jsondata = json.loads(urlfile.read())
     return jsondata
 
+def parseUserArguments():
+    parser = argparse.ArgumentParser(description="Create garbage collection plan ;-)")
+
+    parser.add_argument('--offset', type=int, default=None, help='The offset for the event beginning based on 00:00 a.m. local time')
+    parser.add_argument('--duration', type=int, default=None, help='The event duration')
+
+    return parser.parse_args()
+
+def checkDurationValidValue(duration):
+    if (duration is not None):
+        if(duration <= 0):
+            print("Event duration must not be less or equal to 0, ... exit")
+            exit(1)
+
+def noArugmentIsGivenByUser(args):
+    return (args.offset is None) and (args.duration is None)
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    main()
+    args = parseUserArguments()
+
+    if noArugmentIsGivenByUser(args):
+        main()
+    else:
+        checkDurationValidValue(args.duration)
+        main(args.offset, args.duration)
+
+        
+
